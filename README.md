@@ -1,4 +1,4 @@
-# Go-RTMAMS
+# Go-MM
 ### Real Time Mulware Attack Map based on Suricata
 
 start server
