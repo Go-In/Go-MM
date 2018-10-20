@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  <title>Document</title>
+  <script src="https://d3js.org/d3.v3.min.js"></script>
+  <script src="https://d3js.org/d3.geo.projection.v0.min.js"></script>
+  <script src="https://d3js.org/topojson.v1.min.js"></script>
+  <script src="https://datamaps.github.io/scripts/datamaps.world.min.js?v=1"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/2.1.1/socket.io.js"></script>
+  <style>
+    body {
+      background-color: black;
+    }
+    #map {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+      max-width:100%;
+      max-height:100%
+    }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+  <script src="./fixed-queue.js"></script>
+  <script>
+    var map = new Datamap({
+      scope: 'world',
+      element: document.getElementById('map'),
+      projection: 'winkel3',
+      // change the projection to something else only if you have absolutely no cartographic sense
+
+      fills: { defaultFill: 'black', },
+
+      geographyConfig: {
+        dataUrl: null,
+        hideAntarctica: true,
+        borderWidth: 0.75,
+        borderColor: '#4393c3',
+        popupTemplate: function(geography, data) {
+          return '<div class="hoverinfo" style="color:white;background:black">' +
+                geography.properties.name + '</div>';
+        },
+        popupOnHover: true,
+        highlightOnHover: true,
+        highlightFillColor: 'white',
+        highlightBorderColor: 'none',
+      },
+    });
+    var hits = FixedQueue(7, []);
+    var boom = FixedQueue(7, []);
+
+    var socket = io();
+    socket.on('attacking', function(atk){
+      console.log(atk);
+      hits.push({
+        origin: { latitude: atk.srcLat, longitude: atk.srcLong  },
+        destination: { latitude: atk.dstLat, longitude: atk.dstLong },
+        options: {
+          strokeWidth: 2,
+          strokeColor: 'red',
+          animationSpeed: 600,
+        }
+      });
+      boom.push({
+        radius: 10,
+        latitude: atk.dstLat,
+        longitude: atk.dstLong,
+      });
+
+      map.arc(hits);
+      map.bubbles(boom, {
+        highlightOnHover: false,
+        popupOnHover: false,
+        fillOpacity: 0.5,
+      });
+    })
+  </script>
+</body>
+</html>
