@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/go-redis/redis"
 	"github.com/googollee/go-socket.io"
 )
 
@@ -33,6 +34,12 @@ func main() {
 	key := os.Args[1]
 	fmt.Println(key)
 	c := make(chan Attack)
+
+	redisClient := redis.NewClient(&redis.Options{
+		Addr:     "localhost:6379",
+		Password: "", // no password set
+		DB:       0,  // use default DB
+	})
 
 	server, err := socketio.NewServer(nil)
 	if err != nil {
@@ -68,21 +75,29 @@ func main() {
 			attack := Attack{}
 			json.Unmarshal(body, &attack)
 
-			url := fmt.Sprintf("http://api.ipstack.com/%s?access_key=%s&format=1", attack.SrcIP, key)
-			resp, _ := http.Get(url)
-			body, _ = ioutil.ReadAll(resp.Body)
 			ipStackResponse := IPStackResponse{}
-			json.Unmarshal(body, &ipStackResponse)
-
+			if val, _ := redisClient.Get(attack.SrcIP).Result(); val != "" {
+				json.Unmarshal([]byte(val), &ipStackResponse)
+			} else {
+				url := fmt.Sprintf("http://api.ipstack.com/%s?access_key=%s&format=1", attack.SrcIP, key)
+				resp, _ := http.Get(url)
+				body, _ := ioutil.ReadAll(resp.Body)
+				redisClient.Set(attack.SrcIP, string(body), 0)
+				json.Unmarshal(body, &ipStackResponse)
+			}
 			attack.SrcLat = ipStackResponse.Lat
 			attack.SrcLng = ipStackResponse.Lng
 
-			url = fmt.Sprintf("http://api.ipstack.com/%s?access_key=%s&format=1", attack.DstIP, key)
-			resp, _ = http.Get(url)
-			body, _ = ioutil.ReadAll(resp.Body)
 			ipStackResponse = IPStackResponse{}
-			json.Unmarshal(body, &ipStackResponse)
-
+			if val, _ := redisClient.Get(attack.DstIP).Result(); val != "" {
+				json.Unmarshal([]byte(val), &ipStackResponse)
+			} else {
+				url := fmt.Sprintf("http://api.ipstack.com/%s?access_key=%s&format=1", attack.DstIP, key)
+				resp, _ := http.Get(url)
+				body, _ := ioutil.ReadAll(resp.Body)
+				redisClient.Set(attack.DstIP, string(body), 0)
+				json.Unmarshal(body, &ipStackResponse)
+			}
 			attack.DstLat = ipStackResponse.Lat
 			attack.DstLong = ipStackResponse.Lng
 
