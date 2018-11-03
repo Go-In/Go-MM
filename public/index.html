@@ -10,6 +10,7 @@
   <script src="https://d3js.org/topojson.v1.min.js"></script>
   <script src="https://datamaps.github.io/scripts/datamaps.world.min.js?v=1"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/2.1.1/socket.io.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
   <style>
     body {
       background-color: black;
@@ -21,10 +22,23 @@
       max-width:100%;
       max-height:100%
     }
+    #attack-list {
+      font-family: monospace;
+      font-size:10px;
+      position:fixed;
+      width:50%;
+      height:100px;
+      color:white;
+      background-color:black;
+      padding:5px;
+      bottom:0px;
+      overflow-y: auto;
+    }
   </style>
 </head>
 <body>
   <div id="map"></div>
+  <div id="attack-list"></div>
   <script src="./fixed-queue.js"></script>
   <script>
     var map = new Datamap({
@@ -77,6 +91,14 @@
         popupOnHover: false,
         fillOpacity: 0.5,
       });
+      $('#attack-list').append(
+        " (" + atk.srcIP + ") " +
+        " <span style='color:red'>attacks</span> " +
+        " (" + atk.dstIP + ") " +
+        " <span style='color:steelblue'>(" + atk.attackType + ")</span> " +
+        "<br/>"
+      );
+      $('#attack-list').animate({scrollTop: $('#attackdiv').prop("scrollHeight")}, 500);
     })
   </script>
 </body>
