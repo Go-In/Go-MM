@@ -6,10 +6,10 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
-	"os"
 
 	"github.com/go-redis/redis"
 	"github.com/googollee/go-socket.io"
+	"github.com/tkanos/gonfig"
 )
 
 // Attack is ...
@@ -29,16 +29,51 @@ type IPStackResponse struct {
 	Lng float32 `json:"longitude"`
 }
 
+// RedisConfig is ...
+type RedisConfig struct {
+	Host     string `json:"host"`
+	Port     string `json:"port"`
+	Password string `json:"password"`
+	DB       int    `json:"db"`
+}
+
+// Config is ...
+type Config struct {
+	RedisConfig RedisConfig `json:"redis"`
+	IPStackKey  string      `json:"ipstack_key"`
+	Host        string      `json:"host"`
+	Port        string      `json:"port"`
+}
+
+var redisClient *redis.Client
+var config Config
+
+func getGeoFromIPStack(ip string) IPStackResponse {
+	ipStackResponse := IPStackResponse{}
+	if val, _ := redisClient.Get(ip).Result(); val != "" {
+		json.Unmarshal([]byte(val), &ipStackResponse)
+	} else {
+		url := fmt.Sprintf("http://api.ipstack.com/%s?access_key=%s&format=1", ip, config.IPStackKey)
+		resp, _ := http.Get(url)
+		body, _ := ioutil.ReadAll(resp.Body)
+		redisClient.Set(ip, string(body), 0)
+		json.Unmarshal(body, &ipStackResponse)
+	}
+	return ipStackResponse
+}
+
 func main() {
-	// ip stack key
-	key := os.Args[1]
-	fmt.Println(key)
+	err := gonfig.GetConf("./src/config.json", &config)
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	c := make(chan Attack)
 
-	redisClient := redis.NewClient(&redis.Options{
-		Addr:     "localhost:6379",
-		Password: "", // no password set
-		DB:       0,  // use default DB
+	redisClient = redis.NewClient(&redis.Options{
+		Addr:     fmt.Sprintf("%s:%s", config.RedisConfig.Host, config.RedisConfig.Port),
+		Password: config.RedisConfig.Password, // no password set
+		DB:       config.RedisConfig.DB,       // use default DB
 	})
 
 	server, err := socketio.NewServer(nil)
@@ -75,29 +110,11 @@ func main() {
 			attack := Attack{}
 			json.Unmarshal(body, &attack)
 
-			ipStackResponse := IPStackResponse{}
-			if val, _ := redisClient.Get(attack.SrcIP).Result(); val != "" {
-				json.Unmarshal([]byte(val), &ipStackResponse)
-			} else {
-				url := fmt.Sprintf("http://api.ipstack.com/%s?access_key=%s&format=1", attack.SrcIP, key)
-				resp, _ := http.Get(url)
-				body, _ := ioutil.ReadAll(resp.Body)
-				redisClient.Set(attack.SrcIP, string(body), 0)
-				json.Unmarshal(body, &ipStackResponse)
-			}
+			ipStackResponse := getGeoFromIPStack(attack.SrcIP)
 			attack.SrcLat = ipStackResponse.Lat
 			attack.SrcLng = ipStackResponse.Lng
 
-			ipStackResponse = IPStackResponse{}
-			if val, _ := redisClient.Get(attack.DstIP).Result(); val != "" {
-				json.Unmarshal([]byte(val), &ipStackResponse)
-			} else {
-				url := fmt.Sprintf("http://api.ipstack.com/%s?access_key=%s&format=1", attack.DstIP, key)
-				resp, _ := http.Get(url)
-				body, _ := ioutil.ReadAll(resp.Body)
-				redisClient.Set(attack.DstIP, string(body), 0)
-				json.Unmarshal(body, &ipStackResponse)
-			}
+			ipStackResponse = getGeoFromIPStack(attack.DstIP)
 			attack.DstLat = ipStackResponse.Lat
 			attack.DstLong = ipStackResponse.Lng
 
@@ -110,6 +127,6 @@ func main() {
 	})
 
 	http.Handle("/", http.FileServer(http.Dir("./public")))
-	log.Println("Serving at localhost:3000...")
-	log.Fatal(http.ListenAndServe(":3000", nil))
+	log.Println(fmt.Sprintf("Serving at %s:%s...", config.Host, config.Port))
+	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%s", config.Port), nil))
 }

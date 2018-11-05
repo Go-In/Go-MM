@@ -1,0 +1,7 @@
+package: github.com/tidjungs/real-time-attack-map
+import:
+- package: github.com/go-redis/redis
+  version: ^6.14.2
+- package: github.com/googollee/go-socket.io
+- package: github.com/tkanos/gonfig
+  version: ^1.0.0
