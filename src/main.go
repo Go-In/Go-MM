@@ -51,8 +51,10 @@ var config Config
 func getGeoFromIPStack(ip string) IPStackResponse {
 	ipStackResponse := IPStackResponse{}
 	if val, _ := redisClient.Get(ip).Result(); val != "" {
+		log.Println("GET from redis")
 		json.Unmarshal([]byte(val), &ipStackResponse)
 	} else {
+		log.Println("GET from ipstack 1234")
 		url := fmt.Sprintf("http://api.ipstack.com/%s?access_key=%s&format=1", ip, config.IPStackKey)
 		resp, _ := http.Get(url)
 		body, _ := ioutil.ReadAll(resp.Body)
@@ -126,7 +128,7 @@ func main() {
 		}
 	})
 
-	http.Handle("/", http.FileServer(http.Dir("./public")))
+	http.Handle("/", http.FileServer(http.Dir("./src/public")))
 	log.Println(fmt.Sprintf("Serving at %s:%s...", config.Host, config.Port))
 	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%s", config.Port), nil))
 }

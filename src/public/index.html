@@ -41,6 +41,20 @@
   <div id="attack-list"></div>
   <script src="./fixed-queue.js"></script>
   <script>
+    var attackTypeToColor = {
+      'Type1': '#e74c3c',
+      'Type2': '#2ecc71',
+      'Type3': '#f1c40f',
+      'Type4': '#9b59b6',
+    }
+
+    function getColorFromAttackType(attackType) {
+      if (attackType in attackTypeToColor) {
+        return attackTypeToColor[attackType]
+      }
+      return '#ecf0f1'
+    }
+
     var map = new Datamap({
       scope: 'world',
       element: document.getElementById('map'),
@@ -75,7 +89,7 @@
         destination: { latitude: atk.dstLat, longitude: atk.dstLong },
         options: {
           strokeWidth: 2,
-          strokeColor: 'red',
+          strokeColor: getColorFromAttackType(atk.attackType),
           animationSpeed: 600,
         }
       });
@@ -91,12 +105,15 @@
         popupOnHover: false,
         fillOpacity: 0.5,
       });
+      if (hits.length >= 7) {
+        $('#attack-list li:first').remove()
+      }
       $('#attack-list').append(
-        " (" + atk.srcIP + ") " +
+        "<li>(" + atk.srcIP + ") " +
         " <span style='color:red'>attacks</span> " +
         " (" + atk.dstIP + ") " +
-        " <span style='color:steelblue'>(" + atk.attackType + ")</span> " +
-        "<br/>"
+        " <span style='color:" + getColorFromAttackType(atk.attackType) + "'>(" + atk.attackType + ")</span> " +
+        "</li>"
       );
       $('#attack-list').animate({scrollTop: $('#attackdiv').prop("scrollHeight")}, 500);
     })
