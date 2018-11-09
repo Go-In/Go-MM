@@ -9,6 +9,7 @@
   <script src="https://d3js.org/d3.geo.projection.v0.min.js"></script>
   <script src="https://d3js.org/topojson.v1.min.js"></script>
   <script src="https://datamaps.github.io/scripts/datamaps.world.min.js?v=1"></script>
+  <script src="datamaps.fading-bubbles.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/2.1.1/socket.io.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
   <style>
@@ -42,7 +43,7 @@
   <script src="./fixed-queue.js"></script>
   <script>
     var attackTypeToColor = {
-      'Type1': '#e74c3c',
+      'Type1': '#19B5FE',
       'Type2': '#2ecc71',
       'Type3': '#f1c40f',
       'Type4': '#9b59b6',
@@ -61,7 +62,13 @@
       projection: 'winkel3',
       // change the projection to something else only if you have absolutely no cartographic sense
 
-      fills: { defaultFill: 'black', },
+      fills: {
+        defaultFill: 'black',
+        Type1: '#19B5FE',
+        Type2: '#2ecc71',
+        Type3: '#f1c40f',
+        Type4: '#9b59b6',
+      },
 
       geographyConfig: {
         dataUrl: null,
@@ -77,9 +84,13 @@
         highlightFillColor: 'white',
         highlightBorderColor: 'none',
       },
+      arcConfig: {
+      }
     });
+    map.addPlugin('fadingBubbles', fadingBubbles);
+
     var hits = FixedQueue(7, []);
-    var boom = FixedQueue(7, []);
+    // var boom = FixedQueue(7, []);
 
     var socket = io();
     socket.on('attacking', function(atk){
@@ -93,18 +104,35 @@
           animationSpeed: 600,
         }
       });
-      boom.push({
-        radius: 10,
-        latitude: atk.dstLat,
-        longitude: atk.dstLong,
-      });
+      // boom.push({
+      //   radius: 10,
+      //   latitude: atk.dstLat,
+      //   longitude: atk.dstLong,
+      // });
 
       map.arc(hits);
-      map.bubbles(boom, {
-        highlightOnHover: false,
-        popupOnHover: false,
-        fillOpacity: 0.5,
-      });
+      // var data = [
+      //     {
+      //         "latitude": "28.014067",
+      //         "longitude": "-81.728676"
+      //     },
+      //     {
+      //         "latitude": "40.750793",
+      //         "longitude": "-73.989525",
+      //         "magnitude": 3
+      //     }
+      // ];
+      map.fadingBubbles([{
+        magnitude: 2,
+        latitude: atk.dstLat,
+        longitude: atk.dstLong,
+        fillKey: atk.attackType,
+      }]);
+      // map.bubbles(boom, {
+      //   highlightOnHover: false,
+      //   popupOnHover: false,
+      //   fillOpacity: 0.5,
+      // });
       if (hits.length >= 7) {
         $('#attack-list li:first').remove()
       }
