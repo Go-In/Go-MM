@@ -14,19 +14,22 @@ import (
 
 // Attack is ...
 type Attack struct {
-	SrcLat     float32 `json:"srcLat"`
-	SrcLng     float32 `json:"srcLong"`
-	DstLat     float32 `json:"dstLat"`
-	DstLong    float32 `json:"dstLong"`
-	SrcIP      string  `json:"srcIP"`
-	DstIP      string  `json:"dstIP"`
-	AttackType string  `json:"attackType"`
+	SrcLat         float32 `json:"srcLat"`
+	SrcLng         float32 `json:"srcLong"`
+	SrcCountryName string  `json:"srcCountryName"`
+	DstLat         float32 `json:"dstLat"`
+	DstLong        float32 `json:"dstLong"`
+	DstCountryName string  `json:"dstCountryName"`
+	SrcIP          string  `json:"src_ip"`
+	DstIP          string  `json:"dst_ip"`
+	AttackType     string  `json:"type"`
 }
 
 // IPStackResponse is ...
 type IPStackResponse struct {
-	Lat float32 `json:"latitude"`
-	Lng float32 `json:"longitude"`
+	Lat         float32 `json:"latitude"`
+	Lng         float32 `json:"longitude"`
+	CountryName string  `json:"country_name"`
 }
 
 // RedisConfig is ...
@@ -115,10 +118,12 @@ func main() {
 			ipStackResponse := getGeoFromIPStack(attack.SrcIP)
 			attack.SrcLat = ipStackResponse.Lat
 			attack.SrcLng = ipStackResponse.Lng
+			attack.SrcCountryName = ipStackResponse.CountryName
 
 			ipStackResponse = getGeoFromIPStack(attack.DstIP)
 			attack.DstLat = ipStackResponse.Lat
 			attack.DstLong = ipStackResponse.Lng
+			attack.DstCountryName = ipStackResponse.CountryName
 
 			c <- attack
 
