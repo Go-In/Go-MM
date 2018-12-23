@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"strings"
 
 	"github.com/go-redis/redis"
 	"github.com/googollee/go-socket.io"
@@ -21,7 +22,7 @@ type Attack struct {
 	DstLong        float32 `json:"dstLong"`
 	DstCountryName string  `json:"dstCountryName"`
 	SrcIP          string  `json:"src_ip"`
-	DstIP          string  `json:"dst_ip"`
+	DstIP          string  `json:"dest_ip"`
 	AttackType     string  `json:"type"`
 }
 
@@ -58,7 +59,7 @@ func getGeoFromIPStack(ip string) IPStackResponse {
 		json.Unmarshal([]byte(val), &ipStackResponse)
 	} else {
 		log.Println("GET from ipstack 1234")
-		url := fmt.Sprintf("http://api.ipstack.com/%s?access_key=%s&format=1", ip, config.IPStackKey)
+		url := fmt.Sprintf("http://localhost:5000/geo-ip?ip=%s", ip)
 		resp, _ := http.Get(url)
 		body, _ := ioutil.ReadAll(resp.Body)
 		redisClient.Set(ip, string(body), 0)
@@ -114,6 +115,10 @@ func main() {
 			body, _ := ioutil.ReadAll(r.Body)
 			attack := Attack{}
 			json.Unmarshal(body, &attack)
+
+			if strings.HasPrefix(attack.SrcIP, "158.108") && strings.HasPrefix(attack.DstIP, "158.108") {
+				return
+			}
 
 			ipStackResponse := getGeoFromIPStack(attack.SrcIP)
 			attack.SrcLat = ipStackResponse.Lat
