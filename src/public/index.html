@@ -93,7 +93,18 @@
     var hitCount = 0;
     var socket = io();
 
+    var timeCounter = 0;
+    // clear arc if none attack comming in 2 seconds
+    setInterval(() => {
+        timeCounter++;
+        if (timeCounter == 2) {
+          map.arc([]);
+          timeCounter = 0;
+        }
+    }, 1000);
+
     socket.on('attacking', function(atk){
+      timeCounter = 0;
       console.log(atk);
       hitCount++;
 
@@ -102,16 +113,16 @@
         destination: { latitude: atk.dstLat, longitude: atk.dstLong },
         options: {
           strokeWidth: 2,
-          strokeColor: getColorFromAttackType(atk.attackType),
+          strokeColor: getColorFromAttackType(atk.type),
           animationSpeed: 600,
         }
       }]);
 
       map.fadingBubbles([{
-        magnitude: 2,
+        magnitude: 1,
         latitude: atk.dstLat,
         longitude: atk.dstLong,
-        fillKey: atk.attackType,
+        fillKey: atk.type,
       }]);
 
       if (hitCount >= 8) {
@@ -121,7 +132,7 @@
       $('#attack-list').append(
         "<li>" + atk.src_ip + " <span style='color: #89C4F4'>(" + atk.srcCountryName + ")</span> " +
         " <span style='color:red'>attacks</span> " +
-        " " + atk.dst_ip + " <span style='color: #89C4F4'>(" + atk.dstCountryName + ")</span> " +
+        " " + atk.dest_ip + " <span style='color: #89C4F4'>(" + atk.dstCountryName + ")</span> " +
         " <span style='color:" + getColorFromAttackType(atk.type) + "'>(" + atk.type + ")</span> " +
         "</li>"
       );
