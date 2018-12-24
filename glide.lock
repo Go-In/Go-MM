@@ -1,5 +1,5 @@
-hash: f69dc78d1523c6d0ef53cd5de7f2e1f39da86fac8f3c3e422ea6627463f87f69
-updated: 2018-11-03T17:16:20.470364+07:00
+hash: 445d6648d0fde6765a3ec7ecc02caebe98c0e1c81b8e54ab77f3f579cb661670
+updated: 2018-12-24T23:23:05.553879+07:00
 imports:
 - name: github.com/go-redis/redis
   version: b3d9bf10f6666b2ee5100a6f3f84f4caf3b4e37d
@@ -23,6 +23,8 @@ imports:
   version: c8aeb1ed9b49d7de8fef8662efb18f1d289c5f2e
 - name: github.com/gorilla/websocket
   version: 483fb8d7c32fcb4b5636cd293a92e3935932e2f4
+- name: github.com/segmentio/kafka-go
+  version: 0b3aacc527812d4040e51211146a43545e82d670
 - name: github.com/tkanos/gonfig
   version: e83209aed2d171bab5ffb312a1e630110481cb99
 testImports: []

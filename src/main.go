@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -10,6 +11,7 @@ import (
 
 	"github.com/go-redis/redis"
 	"github.com/googollee/go-socket.io"
+	kafka "github.com/segmentio/kafka-go"
 	"github.com/tkanos/gonfig"
 )
 
@@ -47,6 +49,24 @@ type Config struct {
 	IPStackKey  string      `json:"ipstack_key"`
 	Host        string      `json:"host"`
 	Port        string      `json:"port"`
+	KafkaAddr   string      `json:"kafka-address"`
+}
+
+type Alert struct {
+	Category  string `json:"category"`
+	Action    string `json:"allowed"`
+	Signature string `json:"signature"`
+}
+
+type SuricataLog struct {
+	DestIP    string `json:"dest_ip"`
+	TimeStamp string `json:"timestamp"`
+	Protocol  string `json:"proto"`
+	EventType string `json:"event_type"`
+	DestPort  int    `json:"dest_port"`
+	SrcPort   int    `json:"src_port"`
+	SrcIP     string `json:"src_ip"`
+	AlertData Alert  `json:"alert"`
 }
 
 var redisClient *redis.Client
@@ -105,6 +125,51 @@ func main() {
 			log.Println("receive from channel")
 			log.Println(atk)
 			server.BroadcastTo("suricata", "attacking", atk)
+		}
+	}()
+
+	go func() {
+		r := kafka.NewReader(kafka.ReaderConfig{
+			Brokers:   []string{config.KafkaAddr + ":9092"},
+			Topic:     "suricata",
+			Partition: 0,
+			MinBytes:  10e3, // 10KB
+			MaxBytes:  10e6, // 10MB
+		})
+		defer r.Close()
+		defer fmt.Println("kafka consumer closed")
+		r.SetOffset(42)
+
+		for {
+			m, err := r.ReadMessage(context.Background())
+			if err != nil {
+				fmt.Println("kafka consumer error:", err.Error())
+			}
+			fmt.Printf("message at offset %d: %s = %s\n", m.Offset, string(m.Key), string(m.Value))
+
+			suricataLog := SuricataLog{}
+			err = json.Unmarshal(m.Value, &suricataLog)
+			if err == nil {
+				attack := Attack{}
+
+				attack.SrcIP = suricataLog.SrcIP
+				attack.DstIP = suricataLog.DestIP
+				attack.AttackType = suricataLog.AlertData.Category
+
+				ipStackResponse := getGeoFromIPStack(attack.SrcIP)
+				attack.SrcLat = ipStackResponse.Lat
+				attack.SrcLng = ipStackResponse.Lng
+				attack.SrcCountryName = ipStackResponse.CountryName
+
+				ipStackResponse = getGeoFromIPStack(attack.DstIP)
+				attack.DstLat = ipStackResponse.Lat
+				attack.DstLong = ipStackResponse.Lng
+				attack.DstCountryName = ipStackResponse.CountryName
+
+				c <- attack
+			} else {
+				fmt.Println(err.Error())
+			}
 		}
 	}()
 

@@ -5,3 +5,5 @@ import:
 - package: github.com/googollee/go-socket.io
 - package: github.com/tkanos/gonfig
   version: ^1.0.0
+- package: github.com/segmentio/kafka-go
+  version: ^0.2.2
