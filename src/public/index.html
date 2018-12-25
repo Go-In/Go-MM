@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta http-equiv="X-UA-Compatible" content="ie=edge">
-  <title>Document</title>
+  <title>Real Time Mulware Attack Map</title>
   <script src="https://d3js.org/d3.v3.min.js"></script>
   <script src="https://d3js.org/d3.geo.projection.v0.min.js"></script>
   <script src="https://d3js.org/topojson.v1.min.js"></script>
@@ -12,6 +12,10 @@
   <script src="datamaps.fading-bubbles.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/2.1.1/socket.io.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+  <script type="text/javascript" src="http://echarts.baidu.com/gallery/vendors/echarts/echarts.min.js"></script>
+  <script type="text/javascript" src="http://echarts.baidu.com/gallery/vendors/echarts/map/js/world.js"></script>
+  <link href="https://unpkg.com/nes.css/css/nes.min.css" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css?family=Press+Start+2P" rel="stylesheet">
   <style>
     body {
       background-color: black;
@@ -28,33 +32,201 @@
       font-family: monospace;
       font-size:12px;
       position:fixed;
-      width:50%;
+      width:45%;
       height:100px;
       color:white;
       background-color:black;
       padding:5px;
       bottom:0px;
       overflow-y: auto;
+      cursor: pointer;
     }
+    #attack-list:hover {
+      opacity: 0.4;
+    }
+    .modal {
+      display: none; /* Hidden by default */
+      position: fixed; /* Stay in place */
+      z-index: 1; /* Sit on top */
+      left: 0;
+      top: 0;
+      width: 100%; /* Full width */
+      height: 100%; /* Full height */
+      overflow: auto; /* Enable scroll if needed */
+      background-color: rgb(0,0,0); /* Fallback color */
+      background-color: rgba(0,0,0,0.4); /* Black w/ opacity */
+    }
+    .modal-content {
+      background-color: #fefefe;
+      margin: 5% auto; /* 15% from the top and centered */
+      padding: 20px;
+      width: 80%; /* Could be more or less, depending on screen size */
+    }
+    .close {
+      color: #aaa;
+      float: right;
+      font-size: 28px;
+      font-weight: bold;
+    }
+
+    .close:hover,
+    .close:focus {
+      color: black;
+      text-decoration: none;
+      /* cursor: pointer; */
+    }
+    #attack-logs-table {
+      font-size: 10px;
+    }
+    .attack-logs-content {
+      display: none;
+    }
+    .top-content {
+      display: none;
+    }
+    .map-content {
+      display: none;
+    }
+    .nes-container {
+      border-color: #212529;
+      border-style: solid;
+      border-width: 4px;
+      border-radius: 4px;
+    }
+    /* .nes-button {
+      border: 1px solid black;
+    } */
   </style>
 </head>
 <body>
   <div id="map"></div>
   <div id="attack-list"></div>
-  <script src="./fixed-queue.js"></script>
+  <div id="log-modal" class="modal">
+    <div class="modal-content">
+      <span class="close">&times;</span>
+      <div style="margin-bottom: 20px;">
+        <button type="button" class="nes-btn is-primary" onclick="displayContent('attack-logs-content')">Attack Logs</button>
+        <button class="nes-btn is-success" onclick="displayContent('top-content')">Statistics</button>
+      </div>
+      <div class="attack-logs-content">
+        <section class="nes-container with-title" style="margin-top: 20px;">
+          <div class="nes-table-responsive">
+            <table id="attack-logs-table" class="nes-table is-bordered is-centered" style="width: 95%;">
+              <thead>
+                <th>Src IP</th>
+                <th>Dst IP</th>
+                <th>Src Country</th>
+                <th>Dst Country</th>
+                <th>Attack Type</th>
+                <th>Time</th>
+                <th>Detail</th>
+              </thead>
+              <tbody>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+      <div class="top-content">
+        <div style="height: 360px; display: flex;">
+            <div style="width: 50%;">
+              <p style="margin-bottom: 0px;">Top Source IP</p>
+              <div id="top-attacker-ip-bar" style="height: 100%"></div>
+            </div>
+            <div style="width: 50%;">
+              <p style="margin-bottom: 0px;">Top Destination IP</p>
+              <div id="top-victim-ip-bar" style="height: 100%"></div>
+            </div>
+          </div>
+          <div style="height: 360px; display: flex;">
+            <div style="width: 50%;">
+              <p style="margin-bottom: 0px;">Top Source Country</p>
+              <div id="top-attacker-country-bar" style="height: 100%"></div>
+            </div>
+            <div style="width: 50%;">
+              <p style="margin-bottom: 0px;">Top Destination Country</p>
+              <div id="top-victim-country-bar" style="height: 100%"></div>
+            </div>
+          </div>
+          <!-- <div style="height: 360px; display: flex;">
+            <div style="width: 100%;">
+              <p style="margin-bottom: 0px;">Top Attack Type</p>
+              <div id="top-atk-type-bar" style="height: 100%"></div>
+            </div>
+          </div> -->
+      </div>
+      <div class="log-detail">
+        <p>Log Detail</p>
+        <div style="display: flex; justify-content: space-between;">
+          <div class="nes-container" style="width: 49%;">
+            <p class="title">Source</p>
+            <ul class="nes-list is-circle">
+              <li id="detail-source-ip">IP Address: </li>
+              <li id="detail-source-lat">Lat: </li>
+              <li id="detail-source-lng">Lng: </li>
+              <li id="detail-source-country">Country: </li>
+              <li id="detail-source-asn">ASN: </li>
+              <li id="detail-source-as-name">AS Name: </li>
+              <li id="detail-source-port">Port: </li>
+              <li id="detail-source-proto">Protocol: </li>
+            </ul>
+          </div>
+          <div class="nes-container" style="width: 49%;">
+            <p class="title">Destination</p>
+            <ul class="nes-list is-circle">
+              <li id="detail-dest-ip">IP Address: </li>
+              <li id="detail-dest-lat">Lat: </li>
+              <li id="detail-dest-lng">Lng: </li>
+              <li id="detail-dest-country">Country: </li>
+              <li id="detail-dest-asn">ASN: </li>
+              <li id="detail-dest-as-name">AS Name: </li>
+              <li id="detail-dest-port">Port: </li>
+              <li id="detail-dest-proto">Protocol: </li>
+            </ul>
+          </div>
+        </div>
+        <br />
+        <div class="nes-container">
+          <p class="title">Attacking</p>
+          <ul class="nes-list is-circle">
+            <li id="detail-category">Category: </li>
+            <li id="detail-signature">Signature: </li>
+            </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script>
     var attackTypeToColor = {
       'Type1': '#F47983',
       'Type2': '#2ecc71',
       'Type3': '#f1c40f',
       'Type4': '#9b59b6',
+    };
+
+    var contentLists = ['attack-logs-content', 'top-content', 'log-detail'];
+    function displayContent(contentName) {
+      for (content of contentLists) {
+        if (content === contentName) {
+          $('.' + content).css('display', 'block');
+        } else {
+          $('.' + content).css('display', 'none');
+        }
+      }
+      if (contentName === 'attack-logs-content') {
+        renderLogs();
+      }
+      if (contentName === 'top-content') {
+        renderTop();
+      }
     }
 
     function getColorFromAttackType(attackType) {
       if (attackType in attackTypeToColor) {
         return attackTypeToColor[attackType]
       }
-      return '#ecf0f1'
+      return 'rgb(236,240,241, 0.8)'
     }
 
     var map = new Datamap({
@@ -74,7 +246,7 @@
       geographyConfig: {
         dataUrl: null,
         hideAntarctica: true,
-        borderWidth: 0.75,
+        borderWidth: 1.5,
         borderColor: '#4393c3',
         popupTemplate: function(geography, data) {
           return '<div class="hoverinfo" style="color:white;background:black">' +
@@ -93,33 +265,39 @@
     var hitCount = 0;
     var socket = io();
 
+    var arcs = [];
+    var freezeLogs;
     var timeCounter = 0;
     // clear arc if none attack comming in 2 seconds
     setInterval(() => {
-        timeCounter++;
-        if (timeCounter == 2) {
-          map.arc([]);
-          timeCounter = 0;
-        }
+      timeCounter++;
+      if (timeCounter == 2) {
+        arcs = []
+        map.arc(arcs);
+        timeCounter = 0;
+      }
     }, 1000);
 
     socket.on('attacking', function(atk){
       timeCounter = 0;
-      console.log(atk);
+      // console.log(atk);
       hitCount++;
-
-      map.arc([{
+      arcs.push({
         origin: { latitude: atk.srcLat, longitude: atk.srcLong  },
         destination: { latitude: atk.dstLat, longitude: atk.dstLong },
         options: {
           strokeWidth: 2,
           strokeColor: getColorFromAttackType(atk.type),
-          animationSpeed: 600,
+          animationSpeed: 400,
         }
-      }]);
+      })
+      if (arcs.length >= 8) {
+        arcs.shift();
+      }
+      map.arc(arcs);
 
       map.fadingBubbles([{
-        magnitude: 1,
+        magnitude: 0.8,
         latitude: atk.dstLat,
         longitude: atk.dstLong,
         fillKey: atk.type,
@@ -137,7 +315,252 @@
         "</li>"
       );
       $('#attack-list').animate({scrollTop: $('#attackdiv').prop("scrollHeight")}, 500);
+      // $('#attack-logs-table tbody').append(
+      //   `<tr>
+      //     <td>${atk.src_ip}</td>
+      //     <td>${atk.dest_ip}</td>
+      //     <td>${atk.srcCountryName}</td>
+      //     <td>${atk.dstCountryName}</td>
+      //     <td>${atk.type}</td>
+      //     <td>${1234}</td>
+      //   </tr>`
+      // )
     })
+    var logModal = document.getElementById('log-modal');
+    var modelIsOpen = false;
+
+    $(window).click(function(e) {
+      if (modelIsOpen) {
+        if (e.target === logModal) {
+          $('#log-modal').css('display', 'none');
+        }
+      }
+    });
+
+    $('#attack-list').click(function() {
+      modelIsOpen = true;
+      $('#log-modal').css('display', 'block');
+      displayContent('attack-logs-content');
+    });
+
+    $('.close').click(function() {
+      modelIsOpen = false;
+      $('#log-modal').css('display', 'none');
+    });
+
+    function getSideBarChartOption(data, metaData) {
+      return {
+        yAxis: {
+          type: 'category',
+          data: metaData
+        },
+        grid: {
+          top: 10,
+          left: 10,
+          containLabel: true
+        },
+        xAxis: {
+          type: 'value'
+        },
+        series: [{
+          data: data,
+          type: 'bar'
+        }],
+      }
+    }
+    var atkLogs;
+    function renderLogs() {
+
+      // var mockLogs = [
+      //   {
+      //     srcIP: '192.168.1.1',
+      //     dstIP: '158.108.7.7',
+      //     srcCountryName: 'Thailand',
+      //     dstCountryName: 'Something',
+      //     type: 'Malware',
+      //     time: '1111111111'
+      //   },
+      //   {
+      //     srcIP: '192.168.1.2',
+      //     dstIP: '158.108.7.3',
+      //     srcCountryName: 'Something',
+      //     dstCountryName: 'Thailand',
+      //     type: 'Malware 2',
+      //     time: '22222'
+      //   },
+      // ];
+      $('#attack-logs-table tbody').empty();
+      $.ajax({url: "http://202.28.214.90:8014/list", success: function(result) {
+        var i = 0;
+        atkLogs = result;
+        for (var log of result) {
+          $('#attack-logs-table tbody').append(
+            `<tr>
+              <td>${log.src_ip}</td>
+              <td>${log.dest_ip}</td>
+              <td>${log.src_country_name}</td>
+              <td>${log.dest_country_name}</td>
+              <td>${log.alert_category}</td>
+              <td>${log.timestamp}</td>
+              <td><button class="nes-btn" onclick="renderDetail(${i})">View</td>
+            </tr>`
+          );
+          i++;
+        }
+      }});
+    }
+
+    function renderTop() {
+      var topAttackerIPChart = echarts.init(document.getElementById('top-attacker-ip-bar'));
+      var topVictimIPChart = echarts.init(document.getElementById('top-victim-ip-bar'));
+      var topAttackerCountryChart = echarts.init(document.getElementById('top-attacker-country-bar'));
+      var topVictimCountryChart = echarts.init(document.getElementById('top-victim-country-bar'));
+      $.ajax({url: "http://202.28.214.90:8014/stat", success: function(result) {
+        result.src_ip.shift();
+        result.dest_ip.shift();
+        result.src_country.shift();
+        result.dest_country.shift();
+        result.src_ip = result.src_ip.sort(function(a, b) {
+          return a.value - b.value
+        }).splice(10);
+        result.dest_ip = result.dest_ip.sort(function(a, b) {
+          return a.value - b.value
+        }).splice(10);
+        result.src_country.sort(function(a, b) {
+          return a.value - b.value
+        });
+        result.dest_country.sort(function(a, b) {
+          return a.value - b.value
+        });
+        var srcIPdata = result.src_ip.map(r => r.value)
+        var srcIPMetaData = result.src_ip.map(r => r.src_ip)
+        var destIPdata = result.dest_ip.map(r => r.value)
+        var destIPMetaData = result.dest_ip.map(r => r.dest_ip)
+        var srcCountryData = result.src_country.map(r => r.value)
+        var srcCountryMetaData = result.src_country.map(r => r.src_country)
+        var destCountryData = result.dest_country.map(r => r.value)
+        var destCountryMetaData = result.dest_country.map(r => r.dest_country)
+
+        topAttackerIPChart.setOption(getSideBarChartOption(srcIPdata, srcIPMetaData), true);
+        topVictimIPChart.setOption(getSideBarChartOption(destIPdata, destIPMetaData), true);
+        topAttackerCountryChart.setOption(getSideBarChartOption(srcCountryData, srcCountryMetaData), true);
+        topVictimCountryChart.setOption(getSideBarChartOption(destCountryData, destCountryMetaData), true);
+      }});
+
+      // var topAtkTypeChart = echarts.init(document.getElementById('top-atk-type-bar'));
+    }
+
+    function renderDetail(index) {
+      $('.attack-logs-content').css('display', 'none');
+      $('.top-content').css('display', 'none');
+      $('.log-detail').css('display', 'block');
+
+      $('#detail-source-ip').text('IP Address: ' + atkLogs[index].src_ip);
+      $('#detail-source-lat').text('Lat: ' + atkLogs[index].src_latitude);
+      $('#detail-source-lng').text('Lng: ' + atkLogs[index].src_longitude);
+      $('#detail-source-country').text('Country: ' + atkLogs[index].src_country_name);
+      $('#detail-source-asn').text('ASN: ' + atkLogs[index].src_asn);
+      $('#detail-source-as-name').text('AS Name: ' + atkLogs[index].src_autonomous_system);
+      $('#detail-source-port').text('Port: ' + atkLogs[index].src_port);
+      $('#detail-source-proto').text('Protocol: ' + atkLogs[index].proto);
+
+      $('#detail-dest-ip').text('IP Address: ' + atkLogs[index].dest_ip);
+      $('#detail-dest-lat').text('Lat: ' + atkLogs[index].dest_latitude);
+      $('#detail-dest-lng').text('Lng: ' + atkLogs[index].dest_longitude);
+      $('#detail-dest-country').text('Country: ' + atkLogs[index].dest_country_name);
+      $('#detail-dest-asn').text('ASN: ' + atkLogs[index].dest_asn);
+      $('#detail-dest-as-name').text('AS Name: ' + atkLogs[index].dest_autonomous_system);
+      $('#detail-dest-port').text('Port: ' + atkLogs[index].dest_port);
+      $('#detail-dest-proto').text('Protocol: ' + atkLogs[index].proto);
+
+      $('#detail-category').text('Category: ' + atkLogs[index].alert_category);
+      $('#detail-signature').text('Signature: ' + atkLogs[index].alert_signature);
+    }
+
+    // function renderMap(params) {
+    //   var mapChartDOM = document.getElementById('map-chart');
+    //   var mapChart = echarts.init(mapChartDOM);
+    //   option = {
+    //     // backgroundColor: '#404a59',
+    //     // title : {
+    //     //     text: 'World Victim',
+    //     //     subtext: 'From Suricata',
+    //     //     left: 'center',
+    //     //     top: 'top',
+    //     //     textStyle: {
+    //     //         color: '#fff',
+    //     //     }
+    //     // },
+    //     // tooltip : {
+    //     //     trigger: 'item',
+    //     //     formatter : function (params) {
+    //     //         var value = (params.value + '').split('.');
+    //     //         value = value[0].replace(/(\d{1,3})(?=(?:\d{3})+(?!\d))/g, '$1,')
+    //     //                 + '.' + value[1];
+    //     //         return params.seriesName + '<br/>' + params.name + ' : ' + value;
+    //     //     }
+    //     // },
+    //     visualMap: {
+    //         show: false,
+    //         min: 0,
+    //         max: max,
+    //         inRange: {
+    //             symbolSize: [6, 60]
+    //         }
+    //     },
+    //     geo: {
+    //         name: 'World Population (2010)',
+    //         type: 'map',
+    //         map: 'world',
+    //         roam: true,
+    //         label: {
+    //             emphasis: {
+    //                 show: false
+    //             }
+    //         },
+    //         itemStyle: {
+    //             normal: {
+    //                 // areaColor: '#323c48',
+    //                 borderColor: '#111'
+    //             },
+    //             emphasis: {
+    //                 // areaColor: '#2a333d'
+    //             }
+    //         }
+    //     },
+    //     series : [
+    //       {
+    //         type: 'scatter',
+    //         coordinateSystem: 'geo',
+    //         data: mapData.map(function (itemOpt) {
+    //           return {
+    //             name: itemOpt.name,
+    //             value: [
+    //               latlong[itemOpt.code].longitude,
+    //               latlong[itemOpt.code].latitude,
+    //               itemOpt.value
+    //             ],
+    //             label: {
+    //               emphasis: {
+    //                   position: 'right',
+    //                   show: true
+    //               }
+    //             },
+    //             itemStyle: {
+    //               normal: {
+    //                   color: itemOpt.color
+    //               }
+    //             }
+    //           };
+    //         })
+    //       }
+    //     ]
+    //   };
+    //   if (option && typeof option === "object") {
+    //     mapChart.setOption(option, true);
+    //   }
+    // }
+
   </script>
 </body>
 </html>
